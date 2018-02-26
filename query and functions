@@ -1,0 +1,412 @@
+# Privilege
+
+select Host,User from mysql.user;
+Drop  User 'Admin'@'localhost';
+Create User 'Admin'@'localhost' identified By 'admin';
+grant all on `mydb`.* to 'Admin'@'localhost';
+flush privileges;
+grant create,show view on `mydb` to 'Admin'@'localhost';
+flush privileges;
+show grants for 'Admin'@'localhost';
+
+Drop  User 'Developer'@'localhost';
+Create User 'Developer'@'localhost' identified By'deve';
+Grant Select,insert,update,delete on `mydb`.* to 'Developer'@'localhost';
+flush privileges;
+GRANT show view on `mydb`.* to 'Developer'@'localhost';
+flush privileges;
+
+Drop  User  'Tester'@'localhost';
+Create user 'Tester'@'localhost' identified by 'test';
+GRANT select,insert on `mydb`.* to 'Tester'@'localhost';
+flush privileges;
+
+Drop  User  'User'@'localhost';
+Create user 'User'@'localhost' identified by 'us';
+GRANT select on `mydb`.* to 'User'@'localhost';
+flush privileges;
+GRANT insert(commentname,content,cargrading,recommend) on `mydb`.comment to 'User'@'localhost';
+flush privileges;
+
+#query and subquery
+
+# select cars that the msrp is lower than 50000
+SELECT 
+    *
+FROM
+    car
+WHERE
+    msrp < 50000;
+
+# select brand that whose car has the lowest msrp
+SELECT 
+    *
+FROM
+    brand
+WHERE
+    brandid = (SELECT 
+            brandid
+        FROM
+            car
+        WHERE
+            msrp = (SELECT 
+                    MIN(msrp)
+                FROM
+                    car));
+
+# select comment for porsche cayanne
+SELECT 
+    commentname, content, cargrading, recommend
+FROM
+    comment
+WHERE
+    car_carid IN (SELECT 
+            carid
+        FROM
+            car
+        WHERE
+            carname LIKE '%Cayenne%');
+
+# if msrp is greater than 10000, define level as luxury
+SELECT 
+    carname,
+    brandname,
+    msrp,
+    IF(msrp > 100000, 'luxury', 'basic') AS level
+FROM
+    car c
+        INNER JOIN
+    brand b ON b.brandid = c.brandid;
+
+#find the average mpg of suv
+SELECT 
+    AVG(mpg)
+FROM
+    car
+WHERE
+    cartypeid = (SELECT 
+            cartypeid
+        FROM
+            cartype
+        WHERE
+            cartype = 'SUV');
+
+#find the car with max power for every type of car
+SELECT 
+    carname, brandname, MAX(power), cartype
+FROM
+    car c
+        INNER JOIN
+    cartype ct ON c.cartypeid = ct.cartypeid
+        INNER JOIN
+    brand b ON c.brandid = b.brandid
+GROUP BY cartype;
+
+#find the type of car with average of torque over 300
+SELECT 
+    cartype, AVG(torque)
+FROM
+    car c
+        INNER JOIN
+    cartype ct ON c.cartypeid = ct.cartypeid
+GROUP BY cartype
+HAVING AVG(torque) > 300;
+
+#find the most discount and the cordinate car information
+SELECT 
+    dealername,
+    dealerprice,
+    carname,
+    MAX(100 * (msrp - dealerprice) / msrp)
+FROM
+    dealer d
+        INNER JOIN
+    dealer_has_car dhc ON d.dealerid = dhc.dealer_dealerid
+        INNER JOIN
+    car c ON dhc.carid = c.carid;
+
+#find user who commented cars that they have
+SELECT 
+    username, carname
+FROM
+    user u
+        INNER JOIN
+    user_has_car uhc ON u.userid = uhc.user_userid
+        INNER JOIN
+    comment c ON u.userid = c.user_userid
+        INNER JOIN
+    car ON car.carid = uhc.car_carid
+WHERE
+    uhc.car_carid = c.car_carid;
+
+#find all comment about SUV
+SELECT 
+    commentname, content, cargrading, recommend
+FROM
+    comment
+WHERE
+    car_carid IN (SELECT 
+            carid
+        FROM
+            car
+        WHERE
+            cartypeid = (SELECT 
+                    cartypeid
+                FROM
+                    cartype
+                WHERE
+                    cartype = 'SUV'));
+
+# find the cheapest suv for every dealer
+SELECT 
+    carname, cartype, dealername, MIN(dealerprice)
+FROM
+    dealer d
+        INNER JOIN
+    dealer_has_car dhc ON d.dealerid = dhc.dealer_dealerid
+        INNER JOIN
+    car c ON c.carid = dhc.carid
+        INNER JOIN
+    cartype ct ON c.cartypeid = ct.cartypeid
+WHERE
+    cartype = 'SUV'
+GROUP BY dealername;
+
+# find first 10 cars that have the largest msrp
+SELECT 
+    carname, msrp
+FROM
+    car
+ORDER BY msrp DESC
+LIMIT 10;
+
+#concatencate the brand name and car name
+SELECT 
+    CONCAT(brandname, ' ', carname)
+FROM
+    brand b
+        INNER JOIN
+    car c ON b.brandid = c.brandid;
+
+#find the number of comment for every car
+SELECT 
+    carname, COUNT(car_carid)
+FROM
+    car c
+        LEFT JOIN
+    comment com ON c.carid = com.car_carid
+GROUP BY carid;
+
+#find users whose pruchase price of car is less than dealer price
+SELECT DISTINCT
+    username
+FROM
+    user u
+        LEFT JOIN
+    user_has_car uhc ON u.userid = uhc.user_userid
+        LEFT JOIN
+    car c ON uhc.car_carid = c.carid
+        LEFT JOIN
+    dealer_has_car dhc ON c.carid = c.carid
+WHERE
+    uhc.price < dhc.dealerprice;
+
+#find cars with power over 400 or torque over 400
+(SELECT 
+    carname
+FROM
+    car
+WHERE
+    power > 400) UNION (SELECT 
+    carname
+FROM
+    car
+WHERE
+    torque > 400)
+
+#full join of brand and car
+(SELECT 
+    *
+FROM
+    brand
+        LEFT JOIN
+    car ON brand.brandid = car.brandid) UNION (SELECT 
+    *
+FROM
+    brand
+        RIGHT JOIN
+    car ON brand.brandid = car.brandid)
+
+#cross join example
+SELECT 
+    *
+FROM
+    brand
+        CROSS JOIN
+    car;
+
+#string and date/year manipualtion
+SELECT 
+    UPPER(username),
+    CAST(purchasetime AS CHAR (4)),
+    CURRENT_TIME()
+FROM
+    user u
+        INNER JOIN
+    user_has_car uhc
+WHERE
+    u.userid = uhc.user_userid;
+
+#Transaction
+
+START TRANSACTION;
+USE `mydb`;
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (1, 'sedan');
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (2, 'suv');
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (3, 'wagon');
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (4, 'truck');
+SAVEPOINT savepoint1;
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (5, 'convertible');
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (6, 'van');
+SAVEPOINT savepoint2;
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (7, 'coupe');
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (8, 'hatchback');
+SELECT 
+    *
+FROM
+    cartype;
+ROLLBACK TO SAVEPOINT savepoint2;
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (7, 'luxury coupe');
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (8, 'bus');
+SAVEPOINT savepoint3;
+DELETE FROM cartype 
+WHERE
+    cartype LIKE '%bus%';
+ROLLBACK TO savepoint3;
+LOCK TABLE cartype READ;
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (9, 'airjet');
+UNLOCK TABLE;
+INSERT INTO `cartype` (`cartypeid`, `cartype`) VALUES (9, 'airjet');
+COMMIT;
+
+#Store procedure add comment
+
+DROP PROCEDURE IF EXISTS addcomment;
+DELIMITER //
+CREATE PROCEDURE addcomment(
+IN userid int,
+IN carid int,
+IN name VARCHAR(100),
+IN text VARCHAR(1000),
+IN grade int,
+IN rec BOOLEAN)
+
+BEGIN
+
+insert comment(commentname,content,cargrading,
+               recommend,user_userid,car_carid)
+values(name,text,grade,rec,userid,carid);
+
+END//
+DELIMITER ; 
+
+SELECT 
+    *
+FROM
+    car;
+SELECT 
+    *
+FROM
+    comlog;
+call addcomment(2,43,'325435','43654634gvegrfgf',5,True)
+select * from car where carid=43;
+
+DELETE FROM comment 
+WHERE
+    commentid = 201;
+    
+#store procedure carlevel
+
+DROP PROCEDURE IF EXISTS carlevel;
+DELIMITER //
+CREATE PROCEDURE carlevel(
+IN id INT)
+
+BEGIN
+
+DECLARE lv VARCHAR(20);
+DECLARE pri INT;
+
+SELECT msrp into pri from car where carid=id;
+
+if pri <=15000 then
+set lv='A class basic';
+elseif pri>15000 AND pri<=50000 then
+set lv='B class medium';
+elseif pri>50000 and pri<=100000 then
+set lv='C class intermediate';
+else
+set lv='D class luxury';
+end if;
+
+SELECT carname,brandname, msrp, concat(lv,' ',cartype) FROM 
+car c INNER JOIN cartype ct ON c.cartypeid=ct.cartypeid
+INNER JOIN brand b ON b.brandid=c.brandid
+WHERE c.carid=id;
+
+END //
+DELIMITER ; 
+
+CALL carlevel(4);
+#trigger update
+CREATE DEFINER = CURRENT_USER TRIGGER `mydb`.`comment_AFTER_UPDATE` AFTER UPDATE ON `comment` FOR EACH ROW
+BEGIN
+insert into comlog 
+set commentid=old.commentid,
+comname=old.commentname,
+cont=old.content,
+grd=old.cargrading,
+rcm=old.recommend,
+action='UPDATE',
+changedate=now();
+
+update car
+set level=avg(new.cargrading) group by comment.car_carid;
+END
+
+#trigger delete
+
+CREATE DEFINER = CURRENT_USER TRIGGER `mydb`.`comment_BEFORE_DELETE` BEFORE DELETE ON `comment` FOR EACH ROW
+BEGIN
+
+insert into comlog 
+set commentid=old.commentid,
+comname=old.commentname,
+cont=old.content,
+grd=old.cargrading,
+rcm=old.recommend,
+action='DELETE',
+changedate=now();
+
+update car
+set level=avg(new.cargrading) group by comment.car_carid;
+END
+
+#trigger insert
+
+CREATE DEFINER = CURRENT_USER TRIGGER `mydb`.`comment_AFTER_INSERT` AFTER INSERT ON `comment` FOR EACH ROW
+BEGIN
+
+insert into comlog 
+set commentid=new.commentid,
+comname=new.commentname,
+cont=new.content,
+grd=new.cargrading,
+rcm=new.recommend,
+action='INSERT',
+changedate=now();
+
+update car
+set level=avg(new.cargrading)
+group by comment.car_carid;
+END
